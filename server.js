@@ -6,10 +6,7 @@ const mysql = require("mysql2/promise");
 const app = express();
 
 /* ---------- MIDDLEWARE ---------- */
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE"]
-}));
+app.use(cors({ origin: "*", methods: ["GET", "POST"] }));
 app.use(express.json());
 
 /* ---------- DATABASE ---------- */
@@ -38,6 +35,9 @@ app.get("/", (req, res) => {
 app.get("/healthz", (req, res) => {
   res.send("OK");
 });
+
+/* 🔥 AUTH ROUTES */
+app.use("/api/auth", require("./routes/auth"));
 
 /* ---------- START SERVER ---------- */
 const PORT = process.env.PORT || 10000;
