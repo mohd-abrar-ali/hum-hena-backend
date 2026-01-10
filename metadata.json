@@ -1,0 +1,9 @@
+{
+  "name": "Hum Hena",
+  "description": "A hyperlocal marketplace connecting skilled blue-collar workers with customers via secure, identity-verified bookings.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera",
+    "microphone"
+  ]
+}
