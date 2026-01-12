@@ -5,13 +5,21 @@ const cors = require('cors');
 require('dotenv').config();
 
 // Firebase Admin SDK initialization
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  throw new Error("Firebase credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.");
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault()
+  });
+} else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0322108828",
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^"|"$/g, '')
+    })
+  });
+} else {
+  throw new Error("Firebase credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS or FIREBASE_PRIVATE_KEY/FIREBASE_CLIENT_EMAIL.");
 }
-
-admin.initializeApp({
-  credential: admin.credential.applicationDefault()
-});
 
 const app = express();
 app.use(cors());
