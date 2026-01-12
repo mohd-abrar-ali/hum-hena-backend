@@ -1,46 +1,87 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const mysql = require("mysql2/promise");
+const express = require('express');
+const admin = require('firebase-admin');
+const path = require('path');
+const cors = require('cors');
+require('dotenv').config();
+
+// The credentials you provided are for the Frontend. The Backend requires a Service Account.
+// I have set up the structure below. You must replace the placeholders with values from your
+// serviceAccountKey.json file (download from Firebase Console > Project Settings > Service Accounts).
+// Alternatively, set these as Environment Variables in Render.
+const serviceAccount = {
+  projectId: "gen-lang-client-0322108828",
+  privateKey: process.env.FIREBASE_PRIVATE_KEY
+    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    : undefined,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL
+};
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
 const app = express();
-
-/* ---------- MIDDLEWARE ---------- */
-app.use(cors({ origin: "*", methods: ["GET", "POST"] }));
+app.use(cors());
 app.use(express.json());
 
-/* ---------- DATABASE ---------- */
-const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME
-});
+const dbPool = require('./db');
 
-(async () => {
-  try {
-    await db.query("SELECT 1");
-    console.log("✅ Database connected");
-  } catch (err) {
-    console.error("❌ DB connection failed", err);
-    process.exit(1);
+const verifyToken = async (req, res, next) => {
+  const idToken = req.headers.authorization?.split('Bearer ')[1];
+  if (!idToken) {
+    return res.status(401).send('Unauthorized');
   }
-})();
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    res.status(401).send('Unauthorized');
+  }
+};
 
-/* ---------- ROUTES ---------- */
-app.get("/", (req, res) => {
-  res.json({ status: "Backend running" });
+const isAdmin = async (req, res, next) => {
+    const [rows] = await dbPool.query('SELECT role FROM users WHERE id = ?', [req.user.uid]);
+    if (rows.length > 0 && rows[0].role === 'ADMIN') {
+        next();
+    } else {
+        res.status(403).send('Forbidden');
+    }
+}
+
+// Routes
+const jobRoutes = require('./routes/jobs');
+const workerRoutes = require('./routes/workers');
+const adminRoutes = require('./routes/admin');
+const usersRoutes = require('./routes/users');
+const cmsRoutes = require('./routes/cms');
+const transactionRoutes = require('./routes/transactions');
+
+app.use('/api/job', verifyToken, jobRoutes);
+app.use('/api/worker', verifyToken, workerRoutes);
+app.use('/api/admin', verifyToken, isAdmin, adminRoutes);
+app.use('/api/users', verifyToken, usersRoutes);
+app.use('/api/cms', cmsRoutes);
+app.use('/api/transactions', verifyToken, transactionRoutes);
+
+// Serve frontend with cache control
+const distPath = path.join(__dirname, '../../dist');
+app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+    }
+}));
+
+app.get('*', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.sendFile(path.join(distPath, 'index.html'));
 });
 
-app.get("/healthz", (req, res) => {
-  res.send("OK");
-});
-
-/* 🔥 AUTH ROUTES */
-app.use("/api/auth", require("./routes/auth"));
-
-/* ---------- START SERVER ---------- */
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
