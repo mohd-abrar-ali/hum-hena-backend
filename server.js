@@ -4,20 +4,13 @@ const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
 
-// The credentials you provided are for the Frontend. The Backend requires a Service Account.
-// I have set up the structure below. You must replace the placeholders with values from your
-// serviceAccountKey.json file (download from Firebase Console > Project Settings > Service Accounts).
-// Alternatively, set these as Environment Variables in Render.
-const serviceAccount = {
-  project_id: "gen-lang-client-0322108828",
-  private_key: process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/^"|"$/g, '')
-    : undefined,
-  client_email: process.env.FIREBASE_CLIENT_EMAIL
-};
+// Firebase Admin SDK initialization
+if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  throw new Error("Firebase credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.");
+}
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.applicationDefault()
 });
 
 const app = express();
